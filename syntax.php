@@ -10,6 +10,7 @@
  * Modified by  Nicolas H. <prog@a-et-n.com>
  * Modified by  Jonesy <jonesy@oryma.org>
  * Modified by  Samuele Tognini <samuele@netsons.org>
+ * Modified by  Kevin BARAT <dev@kvnbra.com>
  */
 
 if(!defined('DOKU_INC')) define('DOKU_INC',realpath(dirname(__FILE__).'/../../').'/');
@@ -45,6 +46,7 @@ class syntax_plugin_alphaindex extends DokuWiki_Syntax_Plugin {
 
     /**
      * Handle the match
+     * modified by Kevin BARAT <dev@kvnbra.com>
      */
     function handle($match, $state, $pos, &$handler){
         $level = 0;
@@ -78,12 +80,33 @@ class syntax_plugin_alphaindex extends DokuWiki_Syntax_Plugin {
         $match = explode(" ", $match[1]);
         
         // namespaces option
-        $nons = in_array('nons', $match);
-        
+        $nons = false;
         // multi-columns option
-        $incol = in_array('incol', $match);
-        
-        return array($ns, array('level' => $level, 'nons' => $nons, 'incol' => $incol));
+        $incol = false;
+        // specific letter option
+        $letter = false;
+
+        // Check for option matches
+        foreach ($match as $key => $option) {
+            switch ($option) {
+                // namespaces option
+                case 'nons':
+                    $nons = true;
+                    break;
+                // multi-columns option
+                case 'incol':
+                    $incol = true;
+                    break;
+                default:
+                    // specific letter option
+                    if (preg_match('/^letter#([a-zA-Z0-9]|0-9)$/u', $option, $matches)) {
+                        $letter = (isset($matches[1]) ? $matches[1] : false);
+                    }
+                    break;
+            }
+        }
+
+        return array($ns, array('level' => $level, 'nons' => $nons, 'incol' => $incol, 'letter' => $letter));
     }
 
     /**
@@ -132,6 +155,8 @@ class syntax_plugin_alphaindex extends DokuWiki_Syntax_Plugin {
      *
      * This function is a simple hack of DokuWiki html_index($ns)
      * @author Andreas Gohr <andi@splitbrain.org>
+     *
+     * modified by Kevin BARAT <dev@kvnbra.com>
      */
     function _alpha_index($myns, &$renderer) {
         global $conf;
@@ -140,6 +165,9 @@ class syntax_plugin_alphaindex extends DokuWiki_Syntax_Plugin {
         $ns = $myns[0];
         $opts = $myns[1];
 
+        // Limit to one letter configuration
+        $limitToLetter = ($opts['letter'] !== false ? utf8_strtolower($opts['letter']) : false) ;
+        
         // Articles deletion configuration
         $articlesDeletionPatterns = array();
         if($this->getConf('articles_deletion')) {
@@ -249,6 +277,11 @@ class syntax_plugin_alphaindex extends DokuWiki_Syntax_Plugin {
                     } else {
                         $firstLetter = '0-9';
                     }
+                }
+
+                // Skip unwanted letters
+                if ($limitToLetter !== false && $firstLetter !== $limitToLetter) {
+                    continue;
                 }
 
                 if($this->getConf('articles_moving')) {
